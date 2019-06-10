@@ -51,6 +51,7 @@
 
 # Delphi history and backups
 __history/
+lib/
 *.~*
 
 # Castalia statistics file
