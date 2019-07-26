@@ -24,6 +24,8 @@ interface
 
 uses SysUtils;
 
+const SHA1BLOCKSIZE = 64;
+
 const HC0=$67452301;
 const HC1=$EFCDAB89;
 const HC2=$98BADCFE;
@@ -35,8 +37,11 @@ const K2=$6ED9EBA1;
 const K3=$8F1BBCDC;
 const K4=$CA62C1D6;
 
+type
+  SHABlock = array[0..SHA1BLOCKSIZE - 1] of byte;
+
 procedure SHA1Work(Z: string);
-var H0,H1,H2,H3,H4: integer;
+var H0,H1,H2,H3,H4: dword;
 
 implementation
 
@@ -61,136 +66,135 @@ H3 := HC3;  //0x10325476;
 H4 := HC4;  //0xC3D2E1F0;
 end;
 
-function SHA1Padding(s: string; FS: integer):string;                          //добавление одного бита (1000000=128) и добавление нулей до кратности 64 байтам
+procedure SHA1_ProcessBlock(Data: SHABlock);
 var
-size,i: integer;
+  i, A, B, C, D, E, tempVar: dword;
+  W: array[0..15] of dword;
 begin
-size := Length(s) * 8;                                                        //size - входной размер в битах
-s := s + char(128);                                                           //добавление одного бита  (1000000=128)
+     i := 0;
+    while i < SHA1BLOCKSIZE do begin
+      W[i shr 2] := (Data[i] shl 24) or (Data[i + 1] shl 16) or (Data[i + 2] shl 8) or Data[i + 3];
+      i := i + 4;
+    end;
 
-while (Length(s) mod 64) <> 0 do s := s + #0;                                 //добавление нулей до кратности 64 байтам
+    A := H0;
+    B := H1;
+    C := H2;
+    D := H3;
+    E := H4;
 
-if ((size mod 512) >= 448)                                                    //если хвост превышает 48 байт то добавить пустой блок из 64 нулей
-   then begin
-        s := s + #0;                                                          //добавление нулей до кратности 64
-        while (Length(s) mod 64) <>0 do s := s + #0;
+    for i := 0 to 19 do
+    begin
+        if (i < 16) then tempVar := Rol(A, 5) + (D xor (B and (C xor D))) + E + K1 + W[i]
+        else begin
+            W[i and $0F] := Rol(W[(i - 3) and $0F] xor W[(i - 8) and $0F] xor W[(i - 14) and $0F] xor W[i and $0F], 1);
+            tempVar := Rol(A, 5) + (D xor (B and (C xor D))) + E + K1 + W[i and $0F];
         end;
+        E := D;
+        D := C;
+        C := Rol(B, 30);
+        B := A;
+        A := tempVar;
+    end;
 
-i := Length(s); size := FS * 8;
-while size > 0 do                                                             //запись в конец строки её размер
-  begin
-  s[i] := char(byte(size));                                                   //получение младшего байта
-  size := size shr 8;                                                         //сдвиг вправо на 8 бит - перенос старшего байта на место младшего
-  i := i - 1;
-  end;
-Result := s;
-end;
+    for i := 20 to 39 do
+    begin
+        W[i and $0F] := Rol(W[(i - 3) and $0F] xor W[(i - 8) and $0F] xor W[(i - 14) and $0F] xor W[i and $0F], 1);
+        tempVar := Rol(A, 5) + (B xor C xor D) + E + K2 + W[i and $0F];
 
-procedure SHA1Start(const S_IN: string);
-var
-A, B, C, D, E, TEMP: dword;
-t, i: byte;
-W: array[0..79] of dword;
-begin
+        E := D;
+        D := C;
+        C := Rol(B, 30);
+        B := A;
+        A := tempVar;
+    end;
 
-t := 1;
-for i := 1 to ((Length(S_IN)) div 4) do
-  begin
-  W[i - 1] := (ord(S_IN[t]) shl 24) + (ord(S_IN[t + 1]) shl 16) + (ord(S_IN[t + 2]) shl 8) + ord(S_IN[t + 3]);
-  t := t + 4;
-  end;
+    for i := 40 to 59 do
+    begin
+        W[i and $0F] := Rol(W[(i - 3) and $0F] xor W[(i - 8) and $0F] xor W[(i - 14) and $0F] xor W[i and $0F], 1);
+        tempVar := Rol(A, 5) + ((B and C) or (D and (B or C))) + E + K3 + W[i and $0F];
 
+        E := D;
+        D := C;
+        C := Rol(B, 30);
+        B := A;
+        A := tempVar;
+    end;
 
-for t := 16 to 79 do W[t] := ROL(W[t - 3] xor W[t - 8] xor W[t - 14] xor W[t - 16], 1);
+    for i := 60 to 79 do
+    begin
+        W[i and $0F] := Rol(W[(i - 3) and $0F] xor W[(i - 8) and $0F] xor W[(i - 14) and $0F] xor W[i and $0F], 1);
+        tempVar := Rol(A, 5) + (B xor C xor D) + E + K4 + W[i and $0F];
 
-A := H0;
-B := H1;
-C := H2;
-D := H3;
-E := H4;
+        E := D;
+        D := C;
+        C := Rol(B, 30);
+        B := A;
+        A := tempVar;
+    end;
 
-for t := 0 to 19 do
-  begin
-  TEMP := ROL(A, 5) + ((B and C) or ((not B) and D)) + E + K1 + W[t];
-  E := D; D := C; C := ROL(B, 30); B := A; A := TEMP;
-  end;
-
-for t := 20 to 39 do
-  begin
-  TEMP := ROL(A, 5) + (B xor C xor D) + E + K2 + W[t];
-  E := D; D := C; C := ROL(B, 30); B := A; A := TEMP;
-  end;
-
-for t := 40 to 59 do
-  begin
-  TEMP := ROL(A, 5) + ((B and C) or (B and D) or (C and D)) + E + K3 + W[t];
-  E := D;  D := C;  C := ROL(B, 30);  B := A;  A := TEMP;
-  end;
-
-for t := 60 to 79 do
-  begin
-  TEMP := ROL(A, 5) + (B xor C xor D) + E + K4 + W[t];
-  E := D; D := C; C := ROL(B, 30); B := A; A := TEMP;
-  end;
-
-H0 := A + H0;
-H1 := B + H1;
-H2 := C + H2;
-H3 := D + H3;
-H4 := E + H4;
+    H0 := H0 + A;
+    H1 := H1 + B;
+    H2 := H2 + C;
+    H3 := H3 + D;
+    H4 := H4 + E;
 end;
 
 procedure SHA1Work(Z: string);
 var
-s, s1: string;
-i, L, FS: integer;
-F: file;
-n: integer;
-Buf: array[1..65536] of char;
+  SourceLength, Length: dword;
+  dbytes: byte;
+  Data, tmpArray: SHABlock;
+  i: byte;
+  MessageBitSize: uint64;
+  F: file;
+  n: integer;
 begin
-s := '';
+     AssignFile(F, Z);
+     FileMode := FmOpenRead;
+     Reset(F, 1);
+     Length := FileSize(F);
 
-AssignFile(F, Z);
-FileMode := FmOpenRead;
-Reset(F, 1);
-FS := FileSize(F);
+     SourceLength := Length;
 
-SHA1Init();
+     SHA1Init();
 
-repeat
-  BlockRead(F, Buf, sizeOf(Buf), n);
-  SetLength(s1, n);
-  for i := 1 to n do s1[i] := Buf[i];
+     while Length > 0 do begin
+          if Length >= SHA1BLOCKSIZE then dbytes := SHA1BLOCKSIZE
+          else dbytes := Length;
 
-  s := s1;
-  L := length(s1);
-  if ((L < 65536) and (L > 0))
-     then begin
-          s1:= SHA1Padding(s, FS);
-          i := 1;
-          L := length(s1);
-          while i < L do
-            begin
-            SHA1Start(copy(s1, i, 64));
-            i := i + 64;
-            end;
+          BlockRead(F, Data, dbytes, n);
+
+          if (Length > SHA1BLOCKSIZE) then SHA1_ProcessBlock(Data)
+          else begin
+               if Length = SHA1BLOCKSIZE then begin
+                 SHA1_ProcessBlock(Data);
+                 Length := Length - SHA1BLOCKSIZE;
+                 BlockRead(F, Data, Length, n);
+              end;
+
+              move(Data, tmpArray, Length);
+              tmpArray[Length] := $80;
+              fillchar(&tmpArray[Length + 1], sizeof(tmpArray) - Length - 1, $00);
+              if (Length > 55) then begin
+                  SHA1_ProcessBlock(tmpArray);
+                  fillchar(tmpArray, sizeof(tmpArray), $00);
+              end;
+
+              MessageBitSize := SourceLength * 8;
+              i := 63;
+              while (i >= 56) and (MessageBitSize > 0) do begin
+                  tmpArray[i] := MessageBitSize and $FF;
+                  MessageBitSize := MessageBitSize shr 8;
+                  i := i - 1;
+              end;
+              SHA1_ProcessBlock(tmpArray);
+              break;
+          end;
+          Length := Length - SHA1BLOCKSIZE;
      end;
 
-  if L = 65536
-     then begin
-          i := 1;
-          L := length(s1);
-          while i < L do
-            begin
-            SHA1Start(copy(s1, i, 64));
-            i := i + 64;
-            end;
-          end;
-  n := 0;
-until n = 0;
-CloseFile(F);
-
-//Hout:=inttohex(H0,8)+' '+inttohex(H1,8)+' '+inttohex(H2,8)+' '+inttohex(H3,8)+' '+inttohex(H4,8);
+     CloseFile(F);
 end;
 
 end.

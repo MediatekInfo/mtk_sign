@@ -118,6 +118,12 @@ if not StartUp
         HashBuf[22] := (H4 shr 8)  and $FF;
         HashBuf[23] := (H4 shr 0)  and $FF;
 
+        writeln('H0 = ' + IntToHEX(HashBuf[4], 2) + IntToHEX(HashBuf[5], 2) + IntToHEX(HashBuf[6], 2) + IntToHEX(HashBuf[7], 2));
+        writeln('H1 = ' + IntToHEX(HashBuf[8], 2) + IntToHEX(HashBuf[9], 2) + IntToHEX(HashBuf[10], 2) + IntToHEX(HashBuf[11], 2));
+        writeln('H2 = ' + IntToHEX(HashBuf[12], 2) + IntToHEX(HashBuf[13], 2) + IntToHEX(HashBuf[14], 2) + IntToHEX(HashBuf[15], 2));
+        writeln('H3 = ' + IntToHEX(HashBuf[16], 2) + IntToHEX(HashBuf[17], 2) + IntToHEX(HashBuf[18], 2) + IntToHEX(HashBuf[19], 2));
+        writeln('H4 = ' + IntToHEX(HashBuf[20], 2) + IntToHEX(HashBuf[21], 2) + IntToHEX(HashBuf[22], 2) + IntToHEX(HashBuf[23], 2));
+
   try
   BinStream:=TFileStream.Create(BinFile, fmOpenReadWrite);
   except
